@@ -10,26 +10,28 @@ openai.api_key = st.secrets["OPENAI_API_KEY"]
 # Configuración de Spotify
 SPOTIFY_CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
 SPOTIFY_CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
-SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]  # Configurable como un secreto
+SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]
 
 scope = "playlist-modify-public"
 
+# Autenticación con Spotify
+auth_manager = SpotifyOAuth(
+    client_id=SPOTIFY_CLIENT_ID,
+    client_secret=SPOTIFY_CLIENT_SECRET,
+    redirect_uri=SPOTIFY_REDIRECT_URI,
+    scope=scope,
+    open_browser=True
+)
+
 # Verificar conexión con Spotify
-spotify_connection_status = ""
 try:
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-        client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET,
-        redirect_uri=SPOTIFY_REDIRECT_URI,
-        scope=scope
-    ))
-    # Intentar obtener información del usuario para validar la conexión
+    sp = spotipy.Spotify(auth_manager=auth_manager)
     user_info = sp.current_user()
     spotify_connection_status = f"Conexión exitosa con Spotify. Usuario autenticado: {user_info['display_name']}"
 except Exception as e:
     spotify_connection_status = f"Error en la conexión con Spotify: {e}"
 
-# Mostrar estado de conexión con Spotify antes de proceder
+# Interfaz de la App
 st.title("🎵 Generador y Creador de Playlists por Estado de Ánimo 🎶")
 st.markdown(f"**Estado de la conexión con Spotify:** {spotify_connection_status}")
 
