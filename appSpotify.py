@@ -94,7 +94,7 @@ def generate_song_list(mood, genres):
         st.error(f"Error al generar la lista de canciones: {e}")
         return []
 
-# Function to create a new playlist
+# Function to create a new playlist on Spotify
 def create_playlist(token, user_id, name, description):
     url = f"https://api.spotify.com/v1/users/{user_id}/playlists"
     headers = {
@@ -121,6 +121,13 @@ def search_track(token, track_name):
     response = requests.get(url, headers=headers, params=params)
     return response.json()
 
+# Function to add tracks to a playlist
+def add_tracks_to_playlist(token, playlist_id, track_uris):
+    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.post(url, headers=headers, json={"uris": track_uris})
+    return response
+
 # Streamlit App
 def main():
     st.title("🎵 Spotify Playlist Manager")
@@ -145,24 +152,44 @@ def main():
     else:
         st.success("Ya estás autenticado.")
 
-    # Step 2: Generate song list using ChatGPT
+    # Step 2: Generate songs and create playlist
     if "access_token" in st.session_state:
         token = st.session_state.access_token
-        st.subheader("🎶 Generar canciones basadas en tu estado de ánimo")
+        st.subheader("🎶 Generar y crear lista de reproducción")
+        user_id = st.text_input("Introduce tu ID de usuario de Spotify:", value="", placeholder="Usuario de Spotify")
         mood = st.selectbox("Selecciona tu estado de ánimo deseado:", ["Concentración", "Mejorar el ánimo", "Relajación"])
         genres = st.multiselect("Selecciona los géneros musicales:", ["Rock", "Hip Hop", "Jazz", "Pop", "Clásica"])
+        playlist_name = st.text_input("Nombre de la nueva lista de reproducción", placeholder="Mi nueva playlist")
+        playlist_description = st.text_area("Descripción de la lista", placeholder="Describe tu playlist")
 
-        if st.button("Generar lista de canciones"):
-            if mood and genres:
-                st.info("Generando lista de canciones...")
+        if st.button("Generar y Crear Lista"):
+            if mood and genres and playlist_name and user_id:
+                st.info("Generando canciones y creando lista...")
                 songs = generate_song_list(mood, genres)
                 if songs:
-                    st.session_state.generated_songs = songs
-                    st.success("Lista generada exitosamente.")
-                    for song in songs:
-                        st.write(f"🎵 **{song['title']}** - {song['artist']}")
+                    # Crear la lista en Spotify
+                    creation_response = create_playlist(token, user_id, playlist_name, playlist_description)
+                    if "id" in creation_response:
+                        playlist_id = creation_response["id"]
+                        st.success(f"Lista de reproducción '{playlist_name}' creada exitosamente.")
+                        # Buscar canciones en Spotify y agregarlas a la lista
+                        track_uris = []
+                        for song in songs:
+                            search_response = search_track(token, f"{song['title']} {song['artist']}")
+                            if search_response and "tracks" in search_response:
+                                items = search_response["tracks"]["items"]
+                                if items:
+                                    track_uris.append(items[0]["uri"])
+                        if track_uris:
+                            add_response = add_tracks_to_playlist(token, playlist_id, track_uris)
+                            if add_response.status_code == 201:
+                                st.success("Canciones agregadas exitosamente.")
+                            else:
+                                st.error("No se pudieron agregar las canciones.")
+                    else:
+                        st.error("No se pudo crear la lista en Spotify.")
             else:
-                st.warning("Selecciona un estado de ánimo y al menos un género.")
+                st.warning("Completa todos los campos para generar y crear la lista.")
 
 if __name__ == "__main__":
     main()
