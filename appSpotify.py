@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import openai
 
-# Configuración de la API de OpenAI (reemplaza con tu clave de OpenAI en secretos)
+# Configuración de la API de OpenAI
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # Configuración de la página
@@ -30,17 +30,18 @@ if st.button("Crear una Playlist en Spotify"):
     )
 
     try:
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente que genera listas de canciones basadas en estados de ánimo y géneros musicales."},
+                {"role": "user", "content": prompt}
+            ],
             max_tokens=500,
-            n=1,
-            stop=None,
             temperature=0.7,
         )
 
         # Procesar la respuesta de OpenAI
-        songs_text = response.choices[0].text.strip()
+        songs_text = response['choices'][0]['message']['content'].strip()
 
         # Convertir texto a tabla
         data = []
