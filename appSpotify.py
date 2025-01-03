@@ -1,3 +1,4 @@
+import openai
 import streamlit as st
 import requests
 import base64
@@ -6,6 +7,7 @@ from urllib.parse import urlencode
 # Spotify API Credentials
 CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]  # Clave de OpenAI
 REDIRECT_URI = st.secrets.get("SPOTIFY_REDIRECT_URI", "http://localhost:8501/callback")  # Configurado como secreto
 
 # Scopes for Spotify API
@@ -35,6 +37,38 @@ def get_access_token(client_id, client_secret, code, redirect_uri):
     }
     response = requests.post(token_url, headers=headers, data=data)
     return response.json()
+
+# Function to generate songs using ChatGPT (gpt-3.5-turbo)
+def generate_song_list(mood, genres):
+    openai.api_key = OPENAI_API_KEY
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a music expert that generates song recommendations. "
+                "When asked, you provide a JSON list of 10 songs, each with the 'title' and 'artist' keys."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Generate a list of 10 songs based on the mood '{mood}' and the genres {', '.join(genres)}. "
+                f"Provide the response in JSON format as a list of objects, each with 'title' and 'artist'."
+            ),
+        },
+    ]
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=500,
+            temperature=0.7
+        )
+        songs = response.choices[0].message.content.strip()
+        return eval(songs)  # Convertir el texto devuelto a una lista de diccionarios
+    except Exception as e:
+        st.error(f"Error al generar la lista de canciones: {e}")
+        return []
 
 # Function to create a new playlist
 def create_playlist(token, user_id, name, description):
@@ -96,22 +130,13 @@ def main():
 
         if st.button("Generar lista de canciones"):
             if mood and genres:
-                # Call ChatGPT to generate a song list
                 st.info("Generando lista de canciones...")
-                prompt = f"Genera una lista de 10 canciones populares de los géneros {', '.join(genres)} que ayuden a {mood.lower()}."
-                try:
-                    # Replace with a call to OpenAI API if integrated
-                    song_list = [
-                        {"title": "Song 1", "artist": "Artist A"},
-                        {"title": "Song 2", "artist": "Artist B"},
-                        {"title": "Song 3", "artist": "Artist C"},
-                    ]  # Replace with actual ChatGPT response
-                    st.session_state.generated_songs = song_list
+                songs = generate_song_list(mood, genres)
+                if songs:
+                    st.session_state.generated_songs = songs
                     st.success("Lista generada exitosamente.")
-                    for song in song_list:
+                    for song in songs:
                         st.write(f"🎵 **{song['title']}** - {song['artist']}")
-                except Exception as e:
-                    st.error("Hubo un problema al generar la lista de canciones.")
             else:
                 st.warning("Selecciona un estado de ánimo y al menos un género.")
 
@@ -124,16 +149,14 @@ def main():
             new_playlist_description = st.text_area("Descripción de la lista", placeholder="Describe tu playlist")
             if st.button("Crear lista de reproducción"):
                 if new_playlist_name:
-                    # Create the playlist
                     creation_response = create_playlist(token, user_id, new_playlist_name, new_playlist_description)
                     if "id" in creation_response:
                         playlist_id = creation_response["id"]
                         st.success(f"Lista de reproducción '{new_playlist_name}' creada exitosamente.")
-                        # Add songs to the playlist
                         st.info("Agregando canciones a la lista...")
                         track_uris = []
                         for song in st.session_state.generated_songs:
-                            search_response = search_track(token, song["title"])
+                            search_response = search_track(token, f"{song['title']} {song['artist']}")
                             if search_response and "tracks" in search_response:
                                 items = search_response["tracks"]["items"]
                                 if items:
