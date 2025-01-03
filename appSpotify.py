@@ -66,13 +66,13 @@ def generate_song_list(mood, genres):
             "role": "system",
             "content": (
                 "You are a music expert that generates song recommendations. "
-                "When asked, you provide a JSON list of 10 songs, each with the 'title' and 'artist' keys."
+                "When asked, you provide a JSON list of 20 songs, each with the 'title' and 'artist' keys."
             ),
         },
         {
             "role": "user",
             "content": (
-                f"Generate a list of 10 songs based on the mood '{mood}' and the genres {', '.join(genres)}. "
+                f"Generate a list of 20 songs based on the mood '{mood}' and the genres {', '.join(genres)}. "
                 f"Provide the response in JSON format as a list of objects, each with 'title' and 'artist'."
             ),
         },
@@ -81,7 +81,7 @@ def generate_song_list(mood, genres):
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=messages,
-            max_tokens=500,
+            max_tokens=1000,
             temperature=0.7
         )
         songs = response.choices[0].message.content.strip()
@@ -157,8 +157,8 @@ def main():
         token = st.session_state.access_token
         st.subheader("🎶 Generar y crear lista de reproducción")
         user_id = st.text_input("Introduce tu ID de usuario de Spotify:", value="", placeholder="Usuario de Spotify")
-        mood = st.selectbox("Selecciona tu estado de ánimo deseado:", ["Concentración", "Mejorar el ánimo", "Relajación"])
-        genres = st.multiselect("Selecciona los géneros musicales:", ["Rock", "Hip Hop", "Jazz", "Pop", "Clásica"])
+        mood = st.selectbox("Selecciona tu estado de ánimo deseado:", ["Subir el ánimo", "Trabajo", "Concentración", "Fiesta"])
+        genres = st.multiselect("Selecciona los géneros musicales:", ["Rock 80s", "Rock 90s", "Pop 80s", "Rock Progresivo"])
         playlist_name = st.text_input("Nombre de la nueva lista de reproducción", placeholder="Mi nueva playlist")
         playlist_description = st.text_area("Descripción de la lista", placeholder="Describe tu playlist")
 
