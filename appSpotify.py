@@ -1,32 +1,90 @@
 import streamlit as st
 import openai
 import requests
+from urllib.parse import urlencode
 from datetime import datetime
 
 # Configuración de las APIs
 openai.api_key = st.secrets["OPENAI_API_KEY"]
+SPOTIFY_CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
+SPOTIFY_CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
+SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]
+
+scope = "playlist-modify-public user-read-private"
 
 # Estado de la sesión
 if "spotify_access_token" not in st.session_state:
     st.session_state.spotify_access_token = None
 
-# Pantalla de la App
-st.title("🎵 Generador y Creador de Playlists por Estado de Ánimo 🎶")
+if "spotify_refresh_token" not in st.session_state:
+    st.session_state.spotify_refresh_token = None
 
-# Solicitar token de Spotify si no está configurado
+# Funciones para la autenticación
+def get_auth_url():
+    """Genera la URL de autenticación de Spotify."""
+    params = {
+        "response_type": "code",
+        "client_id": SPOTIFY_CLIENT_ID,
+        "scope": scope,
+        "redirect_uri": SPOTIFY_REDIRECT_URI,
+    }
+    return f"https://accounts.spotify.com/authorize?{urlencode(params)}"
+
+def get_access_token(code):
+    """Intercambia el código de autorización por un token de acceso."""
+    token_url = "https://accounts.spotify.com/api/token"
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": SPOTIFY_REDIRECT_URI,
+        "client_id": SPOTIFY_CLIENT_ID,
+        "client_secret": SPOTIFY_CLIENT_SECRET,
+    }
+    response = requests.post(token_url, data=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        st.error(f"Error al obtener el token: {response.json()}")
+        return None
+
+def refresh_access_token(refresh_token):
+    """Refresca el token de acceso usando el refresh token."""
+    token_url = "https://accounts.spotify.com/api/token"
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": SPOTIFY_CLIENT_ID,
+        "client_secret": SPOTIFY_CLIENT_SECRET,
+    }
+    response = requests.post(token_url, data=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        st.error(f"Error al refrescar el token: {response.json()}")
+        return None
+
+# Pantalla principal
+st.title("🎵 Generador y Creador de Playlists en tu Cuenta de Spotify 🎶")
+
 if not st.session_state.spotify_access_token:
-    st.markdown("Para continuar, genera tu token de acceso a Spotify siguiendo los pasos a continuación.")
-    st.markdown("1. Usa el comando de `curl` en tu terminal (ver instrucciones más abajo).")
-    st.markdown("2. Copia y pega el token generado aquí.")
-    token_input = st.text_input("Pega aquí tu token de acceso de Spotify:")
-    if st.button("Guardar Token"):
-        if token_input:
-            st.session_state.spotify_access_token = token_input
-            st.success("¡Token guardado correctamente! Ahora puedes generar y crear playlists.")
+    # Mostrar URL para autenticación
+    st.markdown("### Paso 1: Autenticación en Spotify")
+    auth_url = get_auth_url()
+    st.markdown(f"[Haz clic aquí para autenticarte en Spotify]({auth_url})")
+    st.markdown("### Paso 2: Pega el código de autorización aquí:")
+    code = st.text_input("Código de autorización:")
+
+    if st.button("Autenticar"):
+        if code:
+            token_info = get_access_token(code)
+            if token_info:
+                st.session_state.spotify_access_token = token_info["access_token"]
+                st.session_state.spotify_refresh_token = token_info.get("refresh_token")
+                st.success("¡Autenticación exitosa! Ahora puedes crear playlists.")
         else:
-            st.error("El token no puede estar vacío.")
+            st.error("El código de autorización no puede estar vacío.")
 else:
-    # Solicitar estado de ánimo y tipo de música
+    # Configurar estado de ánimo y tipo de música
     st.header("Configura tu playlist")
 
     mood = st.selectbox(
