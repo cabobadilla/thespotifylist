@@ -15,15 +15,25 @@ SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]  # Ahora configurable 
 scope = "playlist-modify-public"
 
 # Autenticación con Spotify
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-    client_id=SPOTIFY_CLIENT_ID,
-    client_secret=SPOTIFY_CLIENT_SECRET,
-    redirect_uri=SPOTIFY_REDIRECT_URI,
-    scope=scope
-))
+spotify_connection_status = ""
+spotify_playlist_status = ""
+
+try:
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+        client_id=SPOTIFY_CLIENT_ID,
+        client_secret=SPOTIFY_CLIENT_SECRET,
+        redirect_uri=SPOTIFY_REDIRECT_URI,
+        scope=scope
+    ))
+    spotify_connection_status = "Conexión con Spotify exitosa."
+except Exception as e:
+    spotify_connection_status = f"Error en la conexión con Spotify: {e}"
 
 # Configuración de la página
 st.title("🎵 Generador y Creador de Playlists por Estado de Ánimo 🎶")
+
+# Mostrar estado de conexión con Spotify
+st.markdown(f"**Estado de la conexión con Spotify:** {spotify_connection_status}")
 
 # Selección del estado de ánimo y género musical
 st.header("Configura tu playlist")
@@ -89,12 +99,16 @@ if st.button("Generar y Crear Playlist en Spotify"):
 
             if track_uris:
                 sp.playlist_add_items(playlist_id=playlist["id"], items=track_uris)
-                st.success(f"¡Playlist creada exitosamente en Spotify! [Abrir en Spotify]({playlist['external_urls']['spotify']})")
+                spotify_playlist_status = f"¡Playlist creada exitosamente! [Abrir en Spotify]({playlist['external_urls']['spotify']})"
             else:
-                st.warning("No se encontraron canciones en Spotify para agregar a la playlist.")
+                spotify_playlist_status = "No se encontraron canciones en Spotify para agregar a la playlist."
 
         except Exception as e:
-            st.error(f"Error al crear la playlist en Spotify: {e}")
+            spotify_playlist_status = f"Error al crear la playlist en Spotify: {e}"
 
     except Exception as e:
         st.error(f"Hubo un error al generar la playlist: {e}")
+
+# Mostrar el estado de la creación de la playlist en Spotify
+if spotify_playlist_status:
+    st.markdown(f"**Estado de la creación de la playlist en Spotify:** {spotify_playlist_status}")
