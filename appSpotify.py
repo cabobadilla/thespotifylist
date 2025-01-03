@@ -48,6 +48,49 @@ REDIRECT_URI = st.secrets.get("SPOTIFY_REDIRECT_URI", "http://localhost:8501/cal
 # Scopes for Spotify API
 SCOPES = "playlist-modify-private playlist-modify-public"
 
+# Function to get authorization URL
+def get_auth_url(client_id, redirect_uri, scopes):
+    auth_url = "https://accounts.spotify.com/authorize"
+    params = {
+        "client_id": client_id,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "scope": scopes,
+    }
+    return f"{auth_url}?{urlencode(params)}"
+
+# Function to generate creative playlist name and description
+def generate_playlist_details(mood, genres):
+    openai.api_key = OPENAI_API_KEY
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a creative assistant that generates names and descriptions for playlists. "
+                "When asked, you provide a name and description based on the mood and genres provided."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Create a creative name and description for a playlist based on the mood '{mood}' and the genres {', '.join(genres)}."
+                " Respond in JSON format with 'name' and 'description' keys."
+            ),
+        },
+    ]
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=150,
+            temperature=0.7,
+        )
+        details = response.choices[0].message.content.strip()
+        return json.loads(details)
+    except Exception as e:
+        st.error(f"Error al generar el nombre y descripción de la playlist: {e}")
+        return {"name": "Mi Playlist", "description": "Una lista de reproducción personalizada."}
+
 # Streamlit App
 def main():
     st.markdown(
