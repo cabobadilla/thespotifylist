@@ -158,7 +158,7 @@ def main():
         st.subheader("🎶 Generar y crear lista de reproducción")
         user_id = st.text_input("Introduce tu ID de usuario de Spotify:", value="", placeholder="Usuario de Spotify")
         mood = st.selectbox("Selecciona tu estado de ánimo deseado:", ["Subir el ánimo", "Trabajo", "Concentración", "Fiesta"])
-        genres = st.multiselect("Selecciona los géneros musicales:", ["Rock 80s", "Rock 90s", "Pop 80s", "Rock Progresivo"])
+        genres = st.multiselect("Selecciona los géneros musicales:", ["Rock 80s", "Rock 90s", "Pop 80s", "Rock Progresivo", "Rock Pesado"])
         playlist_name = st.text_input("Nombre de la nueva lista de reproducción", placeholder="Mi nueva playlist")
         playlist_description = st.text_area("Descripción de la lista", placeholder="Describe tu playlist")
 
