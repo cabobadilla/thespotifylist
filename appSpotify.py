@@ -47,13 +47,11 @@ def main():
                 st.subheader("🎧 Listas de Reproducción")
                 for playlist in playlists["items"]:
                     with st.expander(f"{playlist['name']} ({playlist['tracks']['total']} canciones)"):
-                        st.markdown(f"[Abrir en Spotify]({playlist['external_urls']['spotify']})")
                         tracks = get_playlist_tracks(token, playlist["id"])
                         if tracks and "items" in tracks:
                             for item in tracks["items"]:
                                 track = item["track"]
                                 st.write(f"**{track['name']}** - {', '.join([artist['name'] for artist in track['artists']])}")
-                                st.markdown(f"[Escuchar en Spotify]({track['external_urls']['spotify']})")
                         else:
                             st.warning("No se pudieron recuperar las canciones de esta lista.")
             else:
