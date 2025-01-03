@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import openai
 
 # Configuración de la API de OpenAI
@@ -21,12 +20,12 @@ genre = st.selectbox(
     ["Rock", "Rock Progresivo", "Rock Alternativo", "Pop 80s", "Pop 90s"]
 )
 
-if st.button("Crear una Playlist en Spotify"):
+if st.button("Crear una Playlist"):
     # Generar lista de canciones usando ChatGPT
     prompt = (
         f"Genera una lista de 30 canciones que sean apropiadas para lograr un estado de ánimo '{mood}' "
-        f"con música del género '{genre}'. Devuelve los resultados en formato tabular con columnas: "
-        f"Grupo, Canción, Año de la canción, Tipo de música o género."
+        f"con música del género '{genre}'. Devuelve los resultados como una lista en formato: "
+        f"- [Grupo] - [Canción] (Año de la canción)."
     )
 
     try:
@@ -43,21 +42,9 @@ if st.button("Crear una Playlist en Spotify"):
         # Procesar la respuesta de OpenAI
         songs_text = response['choices'][0]['message']['content'].strip()
 
-        # Convertir texto a tabla
-        data = []
-        for line in songs_text.split("\n")[1:]:  # Omitimos el encabezado
-            if line.strip():  # Ignorar líneas vacías
-                parts = [part.strip() for part in line.split("|")]
-                if len(parts) == 4:  # Asegurar que cada línea tenga 4 columnas
-                    data.append(parts)
-
-        # Crear DataFrame
-        columns = ["Grupo", "Canción", "Año de la canción", "Tipo de música o género"]
-        df = pd.DataFrame(data, columns=columns)
-
-        # Mostrar la tabla
+        # Mostrar las canciones en formato de lista
         st.subheader("🎧 Tu Playlist Generada:")
-        st.dataframe(df)
+        st.markdown(songs_text)
 
     except Exception as e:
         st.error(f"Hubo un error al generar la playlist: {e}")
