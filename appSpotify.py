@@ -51,6 +51,18 @@ def create_playlist(token, user_id, name, description):
     response = requests.post(url, headers=headers, json=data)
     return response.json()
 
+# Function to search for tracks on Spotify
+def search_track(token, track_name):
+    url = "https://api.spotify.com/v1/search"
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "q": track_name,
+        "type": "track",
+        "limit": 1,
+    }
+    response = requests.get(url, headers=headers, params=params)
+    return response.json()
+
 # Streamlit App
 def main():
     st.title("🎵 Spotify Playlist Manager")
@@ -75,9 +87,36 @@ def main():
     else:
         st.success("Ya estás autenticado.")
 
-    # Step 2: Create a Playlist
+    # Step 2: Generate song list using ChatGPT
     if "access_token" in st.session_state:
         token = st.session_state.access_token
+        st.subheader("🎶 Generar canciones basadas en tu estado de ánimo")
+        mood = st.selectbox("Selecciona tu estado de ánimo deseado:", ["Concentración", "Mejorar el ánimo", "Relajación"])
+        genres = st.multiselect("Selecciona los géneros musicales:", ["Rock", "Hip Hop", "Jazz", "Pop", "Clásica"])
+
+        if st.button("Generar lista de canciones"):
+            if mood and genres:
+                # Call ChatGPT to generate a song list
+                st.info("Generando lista de canciones...")
+                prompt = f"Genera una lista de 10 canciones populares de los géneros {', '.join(genres)} que ayuden a {mood.lower()}."
+                try:
+                    # Replace with a call to OpenAI API if integrated
+                    song_list = [
+                        {"title": "Song 1", "artist": "Artist A"},
+                        {"title": "Song 2", "artist": "Artist B"},
+                        {"title": "Song 3", "artist": "Artist C"},
+                    ]  # Replace with actual ChatGPT response
+                    st.session_state.generated_songs = song_list
+                    st.success("Lista generada exitosamente.")
+                    for song in song_list:
+                        st.write(f"🎵 **{song['title']}** - {song['artist']}")
+                except Exception as e:
+                    st.error("Hubo un problema al generar la lista de canciones.")
+            else:
+                st.warning("Selecciona un estado de ánimo y al menos un género.")
+
+    # Step 3: Create a Playlist with generated songs
+    if "generated_songs" in st.session_state and "access_token" in st.session_state:
         user_id = st.text_input("Introduce tu ID de usuario de Spotify:", value="", placeholder="Usuario de Spotify")
         if user_id:
             st.subheader("🎶 Crear una nueva lista de reproducción")
@@ -85,9 +124,28 @@ def main():
             new_playlist_description = st.text_area("Descripción de la lista", placeholder="Describe tu playlist")
             if st.button("Crear lista de reproducción"):
                 if new_playlist_name:
+                    # Create the playlist
                     creation_response = create_playlist(token, user_id, new_playlist_name, new_playlist_description)
                     if "id" in creation_response:
+                        playlist_id = creation_response["id"]
                         st.success(f"Lista de reproducción '{new_playlist_name}' creada exitosamente.")
+                        # Add songs to the playlist
+                        st.info("Agregando canciones a la lista...")
+                        track_uris = []
+                        for song in st.session_state.generated_songs:
+                            search_response = search_track(token, song["title"])
+                            if search_response and "tracks" in search_response:
+                                items = search_response["tracks"]["items"]
+                                if items:
+                                    track_uris.append(items[0]["uri"])
+                        if track_uris:
+                            add_tracks_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+                            add_tracks_headers = {"Authorization": f"Bearer {token}"}
+                            add_tracks_response = requests.post(add_tracks_url, headers=add_tracks_headers, json={"uris": track_uris})
+                            if add_tracks_response.status_code == 201:
+                                st.success("Canciones agregadas exitosamente.")
+                            else:
+                                st.error("No se pudieron agregar las canciones.")
                     else:
                         st.error("No se pudo crear la lista. Verifica los permisos y vuelve a intentar.")
                 else:
