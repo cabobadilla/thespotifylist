@@ -23,11 +23,18 @@ def get_user_playlists(token, user_id):
     response = requests.get(url, headers=headers)
     return response.json()
 
+# Function to fetch tracks from a playlist
+def get_playlist_tracks(token, playlist_id):
+    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(url, headers=headers)
+    return response.json()
+
 # Streamlit App
 def main():
     st.title("🎵 Mis Listas de Spotify")
     st.markdown(
-        "Una app sencilla para explorar tus listas de reproducción de Spotify. Asegúrate de que tienes tus credenciales de la API configuradas correctamente."
+        "Una app sencilla para explorar tus listas de reproducción y canciones de Spotify. Asegúrate de que tienes tus credenciales de la API configuradas correctamente."
     )
     
     user_id = st.text_input("Introduce tu ID de usuario de Spotify:", value="", placeholder="Usuario de Spotify")
@@ -39,8 +46,16 @@ def main():
             if playlists and "items" in playlists:
                 st.subheader("🎧 Listas de Reproducción")
                 for playlist in playlists["items"]:
-                    st.write(f"**{playlist['name']}** ({playlist['tracks']['total']} canciones)")
-                    st.markdown(f"[Abrir en Spotify]({playlist['external_urls']['spotify']})")
+                    with st.expander(f"{playlist['name']} ({playlist['tracks']['total']} canciones)"):
+                        st.markdown(f"[Abrir en Spotify]({playlist['external_urls']['spotify']})")
+                        tracks = get_playlist_tracks(token, playlist["id"])
+                        if tracks and "items" in tracks:
+                            for item in tracks["items"]:
+                                track = item["track"]
+                                st.write(f"**{track['name']}** - {', '.join([artist['name'] for artist in track['artists']])}")
+                                st.markdown(f"[Escuchar en Spotify]({track['external_urls']['spotify']})")
+                        else:
+                            st.warning("No se pudieron recuperar las canciones de esta lista.")
             else:
                 st.error("No se pudieron recuperar tus listas. Verifica tu ID o permisos.")
         else:
