@@ -10,14 +10,12 @@ openai.api_key = st.secrets["OPENAI_API_KEY"]
 # Configuración de Spotify
 SPOTIFY_CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
 SPOTIFY_CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
-SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]  # Ahora configurable como un secreto
+SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]  # Configurable como un secreto
 
 scope = "playlist-modify-public"
 
-# Autenticación con Spotify
+# Verificar conexión con Spotify
 spotify_connection_status = ""
-spotify_playlist_status = ""
-
 try:
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
         client_id=SPOTIFY_CLIENT_ID,
@@ -25,15 +23,20 @@ try:
         redirect_uri=SPOTIFY_REDIRECT_URI,
         scope=scope
     ))
-    spotify_connection_status = "Conexión con Spotify exitosa."
+    # Intentar obtener información del usuario para validar la conexión
+    user_info = sp.current_user()
+    spotify_connection_status = f"Conexión exitosa con Spotify. Usuario autenticado: {user_info['display_name']}"
 except Exception as e:
     spotify_connection_status = f"Error en la conexión con Spotify: {e}"
 
-# Configuración de la página
+# Mostrar estado de conexión con Spotify antes de proceder
 st.title("🎵 Generador y Creador de Playlists por Estado de Ánimo 🎶")
-
-# Mostrar estado de conexión con Spotify
 st.markdown(f"**Estado de la conexión con Spotify:** {spotify_connection_status}")
+
+# Detener la ejecución si no hay conexión con Spotify
+if "Error" in spotify_connection_status:
+    st.error("No se puede continuar sin conexión a Spotify. Verifica tus credenciales.")
+    st.stop()
 
 # Selección del estado de ánimo y género musical
 st.header("Configura tu playlist")
@@ -99,16 +102,12 @@ if st.button("Generar y Crear Playlist en Spotify"):
 
             if track_uris:
                 sp.playlist_add_items(playlist_id=playlist["id"], items=track_uris)
-                spotify_playlist_status = f"¡Playlist creada exitosamente! [Abrir en Spotify]({playlist['external_urls']['spotify']})"
+                st.success(f"¡Playlist creada exitosamente! [Abrir en Spotify]({playlist['external_urls']['spotify']})")
             else:
-                spotify_playlist_status = "No se encontraron canciones en Spotify para agregar a la playlist."
+                st.warning("No se encontraron canciones en Spotify para agregar a la playlist.")
 
         except Exception as e:
-            spotify_playlist_status = f"Error al crear la playlist en Spotify: {e}"
+            st.error(f"Error al crear la playlist en Spotify: {e}")
 
     except Exception as e:
         st.error(f"Hubo un error al generar la playlist: {e}")
-
-# Mostrar el estado de la creación de la playlist en Spotify
-if spotify_playlist_status:
-    st.markdown(f"**Estado de la creación de la playlist en Spotify:** {spotify_playlist_status}")
