@@ -62,8 +62,9 @@ def main():
         st.markdown(f"[Iniciar sesión en Spotify]({auth_url})", unsafe_allow_html=True)
 
         # Listen for the authorization code in the URL
-        if "code" in st.experimental_get_query_params():
-            code = st.experimental_get_query_params()["code"][0]
+        query_params = st.query_params
+        if "code" in query_params:
+            code = query_params["code"]
             token_response = get_access_token(CLIENT_ID, CLIENT_SECRET, code, REDIRECT_URI)
             if "access_token" in token_response:
                 st.session_state.access_token = token_response["access_token"]
