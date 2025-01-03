@@ -2,6 +2,7 @@ import streamlit as st
 import openai
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from datetime import datetime
 
 # Configuración de las APIs
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -9,7 +10,7 @@ openai.api_key = st.secrets["OPENAI_API_KEY"]
 # Configuración de Spotify
 SPOTIFY_CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
 SPOTIFY_CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
-SPOTIFY_REDIRECT_URI = "https://thespotifylist.streamlit.app/"
+SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]  # Ahora configurable como un secreto
 
 scope = "playlist-modify-public"
 
@@ -22,7 +23,7 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
 ))
 
 # Configuración de la página
-st.title("🎵 Generador de Playlists por Estado de Ánimo 🎶")
+st.title("🎵 Generador y Creador de Playlists por Estado de Ánimo 🎶")
 
 # Selección del estado de ánimo y género musical
 st.header("Configura tu playlist")
@@ -37,7 +38,7 @@ genre = st.selectbox(
     ["Rock", "Rock Progresivo", "Rock Alternativo", "Pop 80s", "Pop 90s"]
 )
 
-if st.button("Crear una Playlist"):
+if st.button("Generar y Crear Playlist en Spotify"):
     # Generar lista de canciones usando ChatGPT
     prompt = (
         f"Genera una lista de 30 canciones que sean apropiadas para lograr un estado de ánimo '{mood}' "
@@ -58,32 +59,42 @@ if st.button("Crear una Playlist"):
 
         # Procesar la respuesta de OpenAI
         songs_text = response['choices'][0]['message']['content'].strip()
+
+        # Mostrar las canciones generadas
         st.subheader("🎧 Tu Playlist Generada:")
         st.markdown(songs_text)
 
-        # Preguntar si se desea crear la playlist en Spotify
-        if st.button("Crear en Spotify"):
-            try:
-                # Crear la playlist en Spotify
-                user_id = sp.current_user()["id"]
-                playlist = sp.user_playlist_create(
-                    user=user_id,
-                    name=f"Playlist {mood} 🎧",
-                    public=True,
-                    description=f"Lista generada para estado de ánimo {mood} y género {genre}."
-                )
+        # Crear la playlist en Spotify
+        try:
+            # Nombre de la playlist
+            current_date = datetime.now().strftime("%d%m%y")
+            playlist_name = f"{current_date} - {mood} - {genre}"
 
-                # Extraer los títulos de las canciones
-                tracks = [line.split("-")[1].strip().split("(")[0] for line in songs_text.split("\n") if "-" in line]
-                results = sp.search(q=tracks[0], type="track", limit=1)
-                track_uris = [item["uri"] for track in results["tracks"]["items"]]
+            # Crear la playlist en Spotify
+            user_id = sp.current_user()["id"]
+            playlist = sp.user_playlist_create(
+                user=user_id,
+                name=playlist_name,
+                public=True,
+                description=f"Playlist generada para estado de ánimo '{mood}' y género '{genre}'."
+            )
 
-                # Agregar canciones a la playlist
+            # Buscar canciones y agregar a la playlist
+            tracks = [line.split("-")[1].strip().split("(")[0] for line in songs_text.split("\n") if "-" in line]
+            track_uris = []
+            for track in tracks[:20]:  # Limitar a las primeras 20 canciones
+                results = sp.search(q=track, type="track", limit=1)
+                if results["tracks"]["items"]:
+                    track_uris.append(results["tracks"]["items"][0]["uri"])
+
+            if track_uris:
                 sp.playlist_add_items(playlist_id=playlist["id"], items=track_uris)
                 st.success(f"¡Playlist creada exitosamente en Spotify! [Abrir en Spotify]({playlist['external_urls']['spotify']})")
+            else:
+                st.warning("No se encontraron canciones en Spotify para agregar a la playlist.")
 
-            except Exception as e:
-                st.error(f"Error al crear la playlist en Spotify: {e}")
+        except Exception as e:
+            st.error(f"Error al crear la playlist en Spotify: {e}")
 
     except Exception as e:
         st.error(f"Hubo un error al generar la playlist: {e}")
