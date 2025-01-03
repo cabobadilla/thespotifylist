@@ -1,33 +1,39 @@
 import streamlit as st
 import requests
 import base64
+from urllib.parse import urlencode
 
 # Spotify API Credentials
 CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
+REDIRECT_URI = st.secrets.get("SPOTIFY_REDIRECT_URI", "http://localhost:8501/callback")  # Configurado como secreto
 
-# Function to get Spotify token
-def get_token(client_id, client_secret):
-    url = "https://accounts.spotify.com/api/token"
-    headers = {
-        "Authorization": "Basic " + base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+# Scopes for Spotify API
+SCOPES = "playlist-modify-private playlist-modify-public"
+
+# Function to get authorization URL
+def get_auth_url(client_id, redirect_uri, scopes):
+    auth_url = "https://accounts.spotify.com/authorize"
+    params = {
+        "client_id": client_id,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "scope": scopes,
     }
-    data = {"grant_type": "client_credentials"}
-    response = requests.post(url, headers=headers, data=data)
-    return response.json().get("access_token")
+    return f"{auth_url}?{urlencode(params)}"
 
-# Function to fetch playlists
-def get_user_playlists(token, user_id):
-    url = f"https://api.spotify.com/v1/users/{user_id}/playlists"
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(url, headers=headers)
-    return response.json()
-
-# Function to fetch tracks from a playlist
-def get_playlist_tracks(token, playlist_id):
-    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(url, headers=headers)
+# Function to get access token using authorization code
+def get_access_token(client_id, client_secret, code, redirect_uri):
+    token_url = "https://accounts.spotify.com/api/token"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }
+    response = requests.post(token_url, headers=headers, data=data)
     return response.json()
 
 # Function to create a new playlist
@@ -40,39 +46,39 @@ def create_playlist(token, user_id, name, description):
     data = {
         "name": name,
         "description": description,
-        "public": False  # False for private playlist
+        "public": False,  # False for private playlist
     }
     response = requests.post(url, headers=headers, json=data)
     return response.json()
 
 # Streamlit App
 def main():
-    st.title("🎵 Mis Listas de Spotify")
-    st.markdown(
-        "Una app sencilla para explorar tus listas de reproducción y canciones de Spotify. Asegúrate de que tienes tus credenciales de la API configuradas correctamente."
-    )
+    st.title("🎵 Spotify Playlist Manager")
     
-    user_id = st.text_input("Introduce tu ID de usuario de Spotify:", value="", placeholder="Usuario de Spotify")
-    
-    if user_id:
-        token = get_token(CLIENT_ID, CLIENT_SECRET)
-        if token:
-            playlists = get_user_playlists(token, user_id)
-            if playlists and "items" in playlists:
-                st.subheader("🎧 Listas de Reproducción")
-                for playlist in playlists["items"]:
-                    with st.expander(f"{playlist['name']} ({playlist['tracks']['total']} canciones)"):
-                        tracks = get_playlist_tracks(token, playlist["id"])
-                        if tracks and "items" in tracks:
-                            for item in tracks["items"]:
-                                track = item["track"]
-                                st.write(f"**{track['name']}** - {', '.join([artist['name'] for artist in track['artists']])}")
-                        else:
-                            st.warning("No se pudieron recuperar las canciones de esta lista.")
+    # Step 1: Authorization
+    st.subheader("1️⃣ Autenticación")
+    if "access_token" not in st.session_state:
+        auth_url = get_auth_url(CLIENT_ID, REDIRECT_URI, SCOPES)
+        st.markdown(f"[Iniciar sesión en Spotify]({auth_url})", unsafe_allow_html=True)
+
+        # Listen for the authorization code in the URL
+        if "code" in st.experimental_get_query_params():
+            code = st.experimental_get_query_params()["code"][0]
+            token_response = get_access_token(CLIENT_ID, CLIENT_SECRET, code, REDIRECT_URI)
+            if "access_token" in token_response:
+                st.session_state.access_token = token_response["access_token"]
+                st.session_state.refresh_token = token_response.get("refresh_token")
+                st.success("Autenticación completada.")
             else:
-                st.error("No se pudieron recuperar tus listas. Verifica tu ID o permisos.")
-            
-            # Section to create a new playlist
+                st.error("No se pudo obtener el token de acceso. Verifica tus credenciales.")
+    else:
+        st.success("Ya estás autenticado.")
+
+    # Step 2: Create a Playlist
+    if "access_token" in st.session_state:
+        token = st.session_state.access_token
+        user_id = st.text_input("Introduce tu ID de usuario de Spotify:", value="", placeholder="Usuario de Spotify")
+        if user_id:
             st.subheader("🎶 Crear una nueva lista de reproducción")
             new_playlist_name = st.text_input("Nombre de la nueva lista de reproducción", placeholder="Mi nueva playlist")
             new_playlist_description = st.text_area("Descripción de la lista", placeholder="Describe tu playlist")
@@ -85,8 +91,6 @@ def main():
                         st.error("No se pudo crear la lista. Verifica los permisos y vuelve a intentar.")
                 else:
                     st.warning("El nombre de la lista no puede estar vacío.")
-        else:
-            st.error("Error al obtener el token de acceso. Verifica tus credenciales.")
 
 if __name__ == "__main__":
     main()
