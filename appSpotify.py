@@ -1,4 +1,5 @@
 import openai
+import json
 import streamlit as st
 import requests
 import base64
@@ -65,7 +66,17 @@ def generate_song_list(mood, genres):
             temperature=0.7
         )
         songs = response.choices[0].message.content.strip()
-        return eval(songs)  # Convertir el texto devuelto a una lista de diccionarios
+        # Validar y convertir el JSON
+        try:
+            song_list = json.loads(songs)
+            if isinstance(song_list, list) and all("title" in song and "artist" in song for song in song_list):
+                return song_list
+            else:
+                st.error("La respuesta no tiene el formato esperado. Por favor, intenta nuevamente.")
+                return []
+        except json.JSONDecodeError:
+            st.error("No se pudo decodificar el JSON de la respuesta de ChatGPT. Intenta nuevamente.")
+            return []
     except Exception as e:
         st.error(f"Error al generar la lista de canciones: {e}")
         return []
