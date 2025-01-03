@@ -174,16 +174,21 @@ def main():
                         st.success(f"Lista de reproducción '{playlist_name}' creada exitosamente.")
                         # Buscar canciones en Spotify y agregarlas a la lista
                         track_uris = []
+                        added_songs = []  # Para almacenar las canciones agregadas exitosamente
                         for song in songs:
                             search_response = search_track(token, f"{song['title']} {song['artist']}")
                             if search_response and "tracks" in search_response:
                                 items = search_response["tracks"]["items"]
                                 if items:
                                     track_uris.append(items[0]["uri"])
+                                    added_songs.append(song)  # Almacenar canción agregada
                         if track_uris:
                             add_response = add_tracks_to_playlist(token, playlist_id, track_uris)
                             if add_response.status_code == 201:
                                 st.success("Canciones agregadas exitosamente.")
+                                st.subheader("🎵 Lista de canciones agregadas:")
+                                for song in added_songs:
+                                    st.write(f"- **{song['title']}** - {song['artist']}")
                             else:
                                 st.error("No se pudieron agregar las canciones.")
                     else:
