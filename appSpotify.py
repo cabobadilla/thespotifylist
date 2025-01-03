@@ -76,9 +76,41 @@ def get_auth_url(client_id, redirect_uri, scopes):
     }
     return f"{auth_url}?{urlencode(params)}"
 
+# Function to generate creative playlist name and description
+def generate_playlist_details(mood, genres):
+    openai.api_key = OPENAI_API_KEY
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a creative assistant that generates names and descriptions for playlists. "
+                "When asked, you provide a name and description based on the mood and genres provided."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Create a creative name and description for a playlist based on the mood '{mood}' and the genres {', '.join(genres)}."
+                " Respond in JSON format with 'name' and 'description' keys."
+            ),
+        },
+    ]
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=150,
+            temperature=0.7,
+        )
+        details = response.choices[0].message.content.strip()
+        return json.loads(details)
+    except Exception as e:
+        st.error(f"Error al generar el nombre y descripción de la playlist: {e}")
+        return {"name": "Mi Playlist", "description": "Una lista de reproducción personalizada."}
+
 # Streamlit App
 def main():
-    st.markdown("<h1 style='text-align: center;'>🎵 Spotify Playlist Manager 🎵</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🎵 Spotify Playlist Creator 🎵</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center;'>Crea listas de reproducción personalizadas según tu estado de ánimo y género favorito.</h3>", unsafe_allow_html=True)
     
     # Step 1: Authorization
@@ -106,14 +138,17 @@ def main():
         token = st.session_state.access_token
         st.markdown("<h2>🎶 Generar y Crear Lista de Reproducción</h2>", unsafe_allow_html=True)
         user_id = st.text_input("🎤 Introduce tu ID de usuario de Spotify", placeholder="Usuario de Spotify")
-        mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Subir el ánimo", "Trabajo", "Concentración", "Fiesta"])
-        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock 80s", "Rock 90s", "Pop 80s", "Rock Progresivo", "Rock Pesado"])
-        playlist_name = st.text_input("📜 Nombre de la nueva lista de reproducción", placeholder="Mi nueva playlist")
-        playlist_description = st.text_area("📝 Descripción de la lista", placeholder="Describe tu playlist")
+        mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Concentración", "Trabajo", "Descanso"])
+        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock Progresivo", "Hip Hop", "Jazz"])
 
         if st.button("🎵 Generar y Crear Lista 🎵"):
-            if mood and genres and playlist_name and user_id:
-                st.info("🎧 Generando canciones y creando lista...")
+            if mood and genres and user_id:
+                st.info("🎧 Generando detalles creativos para la playlist...")
+                details = generate_playlist_details(mood, genres)
+                playlist_name = details["name"]
+                playlist_description = details["description"]
+                st.success(f"✅ Nombre generado: {playlist_name}")
+                st.info(f"Descripción generada: {playlist_description}")
                 # Aquí se integran las funciones de generación de canciones y creación de listas
                 st.success(f"✅ Lista de reproducción '{playlist_name}' creada exitosamente.")
                 st.markdown("<h3>🎵 Lista de canciones agregadas:</h3>", unsafe_allow_html=True)
