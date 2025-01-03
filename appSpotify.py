@@ -1,8 +1,25 @@
 import streamlit as st
 import openai
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
-# Configuración de la API de OpenAI
+# Configuración de las APIs
 openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+# Configuración de Spotify
+SPOTIFY_CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
+SPOTIFY_CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
+SPOTIFY_REDIRECT_URI = "https://thespotifylist.streamlit.app/"
+
+scope = "playlist-modify-public"
+
+# Autenticación con Spotify
+sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+    client_id=SPOTIFY_CLIENT_ID,
+    client_secret=SPOTIFY_CLIENT_SECRET,
+    redirect_uri=SPOTIFY_REDIRECT_URI,
+    scope=scope
+))
 
 # Configuración de la página
 st.title("🎵 Generador de Playlists por Estado de Ánimo 🎶")
@@ -41,10 +58,32 @@ if st.button("Crear una Playlist"):
 
         # Procesar la respuesta de OpenAI
         songs_text = response['choices'][0]['message']['content'].strip()
-
-        # Mostrar las canciones en formato de lista
         st.subheader("🎧 Tu Playlist Generada:")
         st.markdown(songs_text)
+
+        # Preguntar si se desea crear la playlist en Spotify
+        if st.button("Crear en Spotify"):
+            try:
+                # Crear la playlist en Spotify
+                user_id = sp.current_user()["id"]
+                playlist = sp.user_playlist_create(
+                    user=user_id,
+                    name=f"Playlist {mood} 🎧",
+                    public=True,
+                    description=f"Lista generada para estado de ánimo {mood} y género {genre}."
+                )
+
+                # Extraer los títulos de las canciones
+                tracks = [line.split("-")[1].strip().split("(")[0] for line in songs_text.split("\n") if "-" in line]
+                results = sp.search(q=tracks[0], type="track", limit=1)
+                track_uris = [item["uri"] for track in results["tracks"]["items"]]
+
+                # Agregar canciones a la playlist
+                sp.playlist_add_items(playlist_id=playlist["id"], items=track_uris)
+                st.success(f"¡Playlist creada exitosamente en Spotify! [Abrir en Spotify]({playlist['external_urls']['spotify']})")
+
+            except Exception as e:
+                st.error(f"Error al crear la playlist en Spotify: {e}")
 
     except Exception as e:
         st.error(f"Hubo un error al generar la playlist: {e}")
