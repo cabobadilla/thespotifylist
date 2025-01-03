@@ -1,57 +1,32 @@
 import streamlit as st
 import openai
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+import requests
 from datetime import datetime
-import time
 
 # Configuración de las APIs
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Configuración de Spotify
-SPOTIFY_CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
-SPOTIFY_CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
-SPOTIFY_REDIRECT_URI = st.secrets["SPOTIFY_REDIRECT_URI"]
-
-scope = "playlist-modify-public"
-
 # Estado de la sesión
-if "spotify_connected" not in st.session_state:
-    st.session_state.spotify_connected = False
+if "spotify_access_token" not in st.session_state:
+    st.session_state.spotify_access_token = None
 
-if "user_info" not in st.session_state:
-    st.session_state.user_info = {}
+# Pantalla de la App
+st.title("🎵 Generador y Creador de Playlists por Estado de Ánimo 🎶")
 
-# Pantalla 1: Conexión con Spotify
-def connect_to_spotify():
-    try:
-        auth_manager = SpotifyOAuth(
-            client_id=SPOTIFY_CLIENT_ID,
-            client_secret=SPOTIFY_CLIENT_SECRET,
-            redirect_uri=SPOTIFY_REDIRECT_URI,
-            scope=scope,
-            open_browser=True
-        )
-        sp = spotipy.Spotify(auth_manager=auth_manager)
-        user_info = sp.current_user()
-        st.session_state.spotify_connected = True
-        st.session_state.user_info = user_info
-    except Exception as e:
-        st.error(f"Error al conectar con Spotify: {e}")
-        time.sleep(10)  # Esperar 10 segundos en caso de error
-        st.stop()
-
-# Pantalla 2: Generar y Crear Playlist
-def create_playlist():
-    st.title("🎵 Generador y Creador de Playlists por Estado de Ánimo 🎶")
-
-    # Mostrar datos del usuario conectado
-    st.subheader("Información del Usuario:")
-    user_info = st.session_state.user_info
-    st.write(f"**Nombre del Usuario:** {user_info.get('display_name', 'N/A')}")
-    st.write(f"**ID de Usuario:** {user_info.get('id', 'N/A')}")
-
-    # Selección del estado de ánimo y género musical
+# Solicitar token de Spotify si no está configurado
+if not st.session_state.spotify_access_token:
+    st.markdown("Para continuar, genera tu token de acceso a Spotify siguiendo los pasos a continuación.")
+    st.markdown("1. Usa el comando de `curl` en tu terminal (ver instrucciones más abajo).")
+    st.markdown("2. Copia y pega el token generado aquí.")
+    token_input = st.text_input("Pega aquí tu token de acceso de Spotify:")
+    if st.button("Guardar Token"):
+        if token_input:
+            st.session_state.spotify_access_token = token_input
+            st.success("¡Token guardado correctamente! Ahora puedes generar y crear playlists.")
+        else:
+            st.error("El token no puede estar vacío.")
+else:
+    # Solicitar estado de ánimo y tipo de música
     st.header("Configura tu playlist")
 
     mood = st.selectbox(
@@ -96,47 +71,32 @@ def create_playlist():
                 playlist_name = f"{current_date} - {mood} - {genre}"
 
                 # Crear la playlist
-                auth_manager = SpotifyOAuth(
-                    client_id=SPOTIFY_CLIENT_ID,
-                    client_secret=SPOTIFY_CLIENT_SECRET,
-                    redirect_uri=SPOTIFY_REDIRECT_URI,
-                    scope=scope,
-                    open_browser=False
-                )
-                sp = spotipy.Spotify(auth_manager=auth_manager)
-                user_id = st.session_state.user_info["id"]
-                playlist = sp.user_playlist_create(
-                    user=user_id,
-                    name=playlist_name,
-                    public=True,
-                    description=f"Playlist generada para estado de ánimo '{mood}' y género '{genre}'."
-                )
-
-                # Buscar canciones y agregar a la playlist
-                tracks = [line.split("-")[1].strip().split("(")[0] for line in songs_text.split("\n") if "-" in line]
-                track_uris = []
-                for track in tracks[:20]:  # Limitar a las primeras 20 canciones
-                    results = sp.search(q=track, type="track", limit=1)
-                    if results["tracks"]["items"]:
-                        track_uris.append(results["tracks"]["items"][0]["uri"])
-
-                if track_uris:
-                    sp.playlist_add_items(playlist_id=playlist["id"], items=track_uris)
-                    st.success(f"¡Playlist creada exitosamente! [Abrir en Spotify]({playlist['external_urls']['spotify']})")
+                headers = {
+                    "Authorization": f"Bearer {st.session_state.spotify_access_token}",
+                    "Content-Type": "application/json"
+                }
+                user_response = requests.get("https://api.spotify.com/v1/me", headers=headers)
+                if user_response.status_code == 200:
+                    user_id = user_response.json()["id"]
+                    playlist_response = requests.post(
+                        f"https://api.spotify.com/v1/users/{user_id}/playlists",
+                        headers=headers,
+                        json={
+                            "name": playlist_name,
+                            "description": f"Playlist generada para estado de ánimo '{mood}' y género '{genre}'.",
+                            "public": True
+                        }
+                    )
+                    if playlist_response.status_code == 201:
+                        playlist = playlist_response.json()
+                        st.success(f"¡Playlist creada exitosamente! [Abrir en Spotify]({playlist['external_urls']['spotify']})")
+                    else:
+                        st.error(f"Error al crear la playlist: {playlist_response.json()}")
                 else:
-                    st.warning("No se encontraron canciones en Spotify para agregar a la playlist.")
+                    st.error(f"Error al obtener la información del usuario: {user_response.json()}")
 
             except Exception as e:
                 st.error(f"Error al crear la playlist en Spotify: {e}")
 
         except Exception as e:
             st.error(f"Hubo un error al generar la playlist: {e}")
-
-# Lógica de la App
-if not st.session_state.spotify_connected:
-    st.title("🎵 Conexión con Spotify")
-    st.markdown("Haz clic en el botón para autenticarte con Spotify.")
-    if st.button("Conectar con Spotify"):
-        connect_to_spotify()
-else:
-    create_playlist()
