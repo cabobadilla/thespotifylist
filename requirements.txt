@@ -1,3 +1,3 @@
 streamlit
 pandas
-openai
+openai==0.28
