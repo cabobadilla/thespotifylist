@@ -61,38 +61,6 @@ def get_auth_url(client_id, redirect_uri, scopes):
     }
     return f"{auth_url}?{urlencode(params)}"
 
-# Function to generate creative playlist name and description
-def generate_playlist_details(mood, genres):
-    openai.api_key = OPENAI_API_KEY
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a creative assistant that generates names and descriptions for playlists. "
-                "When asked, you provide a name and description based on the mood and genres provided."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Create a creative name and description for a playlist based on the mood '{mood}' and the genres {', '.join(genres)}."
-                " Respond in JSON format with 'name' and 'description' keys."
-            ),
-        },
-    ]
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=150,
-            temperature=0.7,
-        )
-        details = response.choices[0].message.content.strip()
-        return json.loads(details)
-    except Exception as e:
-        st.error(f"Error al generar el nombre y descripción de la playlist: {e}")
-        return {"name": "Mi Playlist", "description": "Una lista de reproducción personalizada."}
-
 # Streamlit App
 def main():
     st.markdown(
@@ -148,21 +116,45 @@ def main():
         user_id = st.text_input("🎤 Introduce tu ID de usuario de Spotify", placeholder="Usuario de Spotify")
         mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Concentración", "Trabajo", "Descanso"])
         genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock Progresivo", "Hip Hop", "Jazz"])
+        generate_details = st.checkbox("🪄 Generar nombre y descripción automáticamente")
 
-        if st.button("🎵 Generar y Crear Lista 🎵"):
-            if mood and genres and user_id:
-                st.info("🎧 Generando detalles creativos para la playlist...")
-                details = generate_playlist_details(mood, genres)
-                playlist_name = details["name"]
-                playlist_description = details["description"]
+        playlist_name = st.text_input("📜 Nombre de la lista de reproducción", placeholder="Mi nueva playlist")
+        playlist_description = st.text_area("📝 Descripción de la lista", placeholder="Describe tu playlist")
+
+        if generate_details and mood and genres:
+            st.info("🎧 Generando detalles creativos para la playlist...")
+            try:
+                openai.api_key = OPENAI_API_KEY
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a creative assistant that generates names and descriptions for playlists."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Create a playlist name and description for the mood '{mood}' and genres {', '.join(genres)}."
+                    },
+                ]
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=messages,
+                    max_tokens=100,
+                )
+                result = response.choices[0].message.content.strip()
+                playlist_name, playlist_description = result.split("\n", 1)
                 st.success(f"✅ Nombre generado: {playlist_name}")
                 st.info(f"Descripción generada: {playlist_description}")
+            except Exception as e:
+                st.error(f"❌ Error al generar los detalles: {e}")
+
+        if st.button("🎵 Crear Lista 🎵"):
+            if playlist_name and playlist_description and user_id:
                 st.success(f"✅ Lista de reproducción '{playlist_name}' creada exitosamente.")
                 st.markdown("<h3>🎵 Lista de canciones agregadas:</h3>", unsafe_allow_html=True)
                 st.markdown("- **Ejemplo Canción 1** - Artista 1")
                 st.markdown("- **Ejemplo Canción 2** - Artista 2")
             else:
-                st.warning("⚠️ Completa todos los campos para generar y crear la lista.")
+                st.warning("⚠️ Completa todos los campos para crear la lista.")
 
 if __name__ == "__main__":
     main()
