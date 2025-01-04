@@ -89,26 +89,36 @@ def generate_songs(mood, genres):
 
         # Log the raw response for debugging
         st.info("📜 Respuesta de ChatGPT:")
-        st.write(songs_response)
+        st.text(songs_response)
 
         # Clean and validate the JSON
         try:
-            songs_data = json.loads(songs_response)  # Convertir la respuesta a JSON
+            # Intentar parsear directamente
+            songs_data = json.loads(songs_response)
+
+            # Validar estructura esperada
             if "songs" in songs_data and isinstance(songs_data["songs"], list):
                 songs = songs_data["songs"]
-                # Ensure all songs have 'title' and 'artist'
                 if all("title" in song and "artist" in song for song in songs):
                     return songs
                 else:
                     raise ValueError("La lista de canciones no contiene los campos 'title' y 'artist'.")
-            else:
-                raise ValueError("El objeto JSON no contiene la clave 'songs' o no es una lista.")
-        except json.JSONDecodeError as e:
-            # Handle JSON parsing issues
-            st.error("❌ La respuesta de ChatGPT no es un JSON válido. Verifica el contenido:")
-            st.text(songs_response)
-            st.error(f"❌ Error de decodificación JSON: {e}")
-            return []
+
+        except json.JSONDecodeError:
+            # Reprocesar el JSON eliminando caracteres adicionales
+            st.warning("⚠️ Intentando limpiar el JSON generado...")
+            cleaned_response = songs_response.replace("```json", "").replace("```", "").strip()
+            try:
+                songs_data = json.loads(cleaned_response)
+                if "songs" in songs_data and isinstance(songs_data["songs"], list):
+                    return songs_data["songs"]
+                else:
+                    raise ValueError("El JSON limpiado no contiene 'songs' como clave.")
+            except json.JSONDecodeError as e:
+                st.error("❌ La respuesta de ChatGPT no pudo ser procesada. Verifica el contenido:")
+                st.text(cleaned_response)
+                st.error(f"❌ Error de decodificación JSON: {e}")
+                return []
 
     except Exception as e:
         st.error(f"❌ Error al generar las canciones: {e}")
