@@ -183,7 +183,7 @@ def main():
         st.markdown("<h2>🎶 Generar y Crear Lista de Reproducción</h2>", unsafe_allow_html=True)
         user_id = st.text_input("🎤 Introduce tu ID de usuario de Spotify", placeholder="Usuario de Spotify")
         mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Concentración", "Trabajo", "Caminar", "Deporte", "Descanso"])
-        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock","Pop", "Rock Progresivo", "Hip Hop", "Rap"])
+        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock", "Pop", "Rock Progresivo", "Hip Hop", "Rap"])
 
         if st.button("🎵 Generar y Crear Lista 🎵"):
             if user_id and mood and genres:
