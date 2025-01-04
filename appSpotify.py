@@ -61,6 +61,30 @@ def get_auth_url(client_id, redirect_uri, scopes):
     }
     return f"{auth_url}?{urlencode(params)}"
 
+# Function to create a playlist on Spotify
+def create_playlist(token, user_id, name, description):
+    url = f"https://api.spotify.com/v1/users/{user_id}/playlists"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"name": name, "description": description, "public": False}
+    response = requests.post(url, headers=headers, json=payload)
+    return response.json()
+
+# Function to search for songs on Spotify
+def search_tracks(token, query):
+    url = "https://api.spotify.com/v1/search"
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {"q": query, "type": "track", "limit": 1}
+    response = requests.get(url, headers=headers, params=params)
+    return response.json()
+
+# Function to add songs to a playlist on Spotify
+def add_tracks_to_playlist(token, playlist_id, track_uris):
+    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"uris": track_uris}
+    response = requests.post(url, headers=headers, json=payload)
+    return response
+
 # Streamlit App
 def main():
     st.markdown(
@@ -72,20 +96,13 @@ def main():
     )
     
     # Step 1: Authorization
-    st.markdown(
-        """
-        <h2 style='color: #1DB954;'>🔑 Autenticación</h2>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown("<h2 style='color: #1DB954;'>🔑 Autenticación</h2>", unsafe_allow_html=True)
     if "access_token" not in st.session_state:
-        # Generar la URL de autorización
         auth_url = get_auth_url(CLIENT_ID, REDIRECT_URI, SCOPES)
         st.markdown(
             f"<div style='text-align: center;'><a href='{auth_url}' target='_blank' style='color: #1DB954; font-weight: bold;'>🔑 Iniciar sesión en Spotify</a></div>",
             unsafe_allow_html=True
         )
-        # Verificar si se recibió el código de autorización
         query_params = st.query_params
         if "code" in query_params:
             code = query_params["code"]
@@ -102,57 +119,48 @@ def main():
             ).json()
             if "access_token" in token_response:
                 st.session_state.access_token = token_response["access_token"]
-                st.session_state.refresh_token = token_response.get("refresh_token")
                 st.success("✅ Autenticación completada.")
             else:
-                st.error("❌ No se pudo obtener el token de acceso. Verifica tus credenciales.")
+                st.error("❌ Error en la autenticación.")
     else:
         st.success("✅ Ya estás autenticado.")
 
-    # Step 2: Generate songs and create playlist
+    # Step 2: Create playlist and add songs
     if "access_token" in st.session_state:
         token = st.session_state.access_token
         st.markdown("<h2>🎶 Generar y Crear Lista de Reproducción</h2>", unsafe_allow_html=True)
         user_id = st.text_input("🎤 Introduce tu ID de usuario de Spotify", placeholder="Usuario de Spotify")
-        mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Concentración", "Trabajo", "Descanso"])
-        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock Progresivo", "Hip Hop", "Jazz"])
-        generate_details = st.checkbox("🪄 Generar nombre y descripción automáticamente")
-
         playlist_name = st.text_input("📜 Nombre de la lista de reproducción", placeholder="Mi nueva playlist")
         playlist_description = st.text_area("📝 Descripción de la lista", placeholder="Describe tu playlist")
+        songs = st.text_area("🎵 Lista de canciones (una por línea)", placeholder="Canción 1\nCanción 2\n...")
 
-        if generate_details and mood and genres:
-            st.info("🎧 Generando detalles creativos para la playlist...")
-            try:
-                openai.api_key = OPENAI_API_KEY
-                messages = [
-                    {
-                        "role": "system",
-                        "content": "You are a creative assistant that generates names and descriptions for playlists."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Create a playlist name and description for the mood '{mood}' and genres {', '.join(genres)}."
-                    },
-                ]
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=messages,
-                    max_tokens=100,
-                )
-                result = response.choices[0].message.content.strip()
-                playlist_name, playlist_description = result.split("\n", 1)
-                st.success(f"✅ Nombre generado: {playlist_name}")
-                st.info(f"Descripción generada: {playlist_description}")
-            except Exception as e:
-                st.error(f"❌ Error al generar los detalles: {e}")
+        if st.button("🎵 Crear Lista"):
+            if user_id and playlist_name and playlist_description and songs:
+                # Crear la playlist
+                playlist_response = create_playlist(token, user_id, playlist_name, playlist_description)
+                if "id" in playlist_response:
+                    playlist_id = playlist_response["id"]
+                    st.success(f"✅ Lista creada: {playlist_name}")
 
-        if st.button("🎵 Crear Lista 🎵"):
-            if playlist_name and playlist_description and user_id:
-                st.success(f"✅ Lista de reproducción '{playlist_name}' creada exitosamente.")
-                st.markdown("<h3>🎵 Lista de canciones agregadas:</h3>", unsafe_allow_html=True)
-                st.markdown("- **Ejemplo Canción 1** - Artista 1")
-                st.markdown("- **Ejemplo Canción 2** - Artista 2")
+                    # Agregar canciones a la playlist
+                    track_uris = []
+                    for song in songs.split("\n"):
+                        if song.strip():
+                            search_response = search_tracks(token, song.strip())
+                            if "tracks" in search_response and search_response["tracks"]["items"]:
+                                track_uris.append(search_response["tracks"]["items"][0]["uri"])
+
+                    if track_uris:
+                        add_response = add_tracks_to_playlist(token, playlist_id, track_uris)
+                        if add_response.status_code == 201:
+                            st.success("🎵 Canciones agregadas exitosamente.")
+                            st.markdown("<h3>🎶 Lista de canciones añadidas:</h3>", unsafe_allow_html=True)
+                            for song in songs.split("\n"):
+                                st.write(f"- {song.strip()}")
+                        else:
+                            st.error("❌ No se pudieron agregar las canciones.")
+                else:
+                    st.error("❌ No se pudo crear la playlist.")
             else:
                 st.warning("⚠️ Completa todos los campos para crear la lista.")
 
