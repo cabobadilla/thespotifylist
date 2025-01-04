@@ -92,10 +92,6 @@ def generate_songs(mood, genres):
             st.error("❌ La respuesta de ChatGPT está vacía. Intenta nuevamente.")
             return []
 
-        # Log the raw response for debugging
-        st.info("📜 Respuesta de ChatGPT:")
-        st.text(songs_response)
-
         # Clean and validate the JSON
         try:
             songs_data = json.loads(songs_response)  # Convertir la respuesta a JSON
@@ -110,7 +106,6 @@ def generate_songs(mood, genres):
                 raise ValueError("El objeto JSON no contiene la clave 'songs' o no es una lista.")
         except json.JSONDecodeError:
             # Reprocesar el JSON eliminando caracteres adicionales
-            st.warning("⚠️ Intentando limpiar el JSON generado...")
             cleaned_response = songs_response.replace("```json", "").replace("```", "").strip()
             try:
                 songs_data = json.loads(cleaned_response)
@@ -118,10 +113,8 @@ def generate_songs(mood, genres):
                     return songs_data["songs"]
                 else:
                     raise ValueError("El JSON limpiado no contiene 'songs' como clave.")
-            except json.JSONDecodeError as e:
-                st.error("❌ La respuesta de ChatGPT no pudo ser procesada. Verifica el contenido:")
-                st.text(cleaned_response)
-                st.error(f"❌ Error de decodificación JSON: {e}")
+            except json.JSONDecodeError:
+                st.error("❌ La respuesta de ChatGPT no pudo ser procesada.")
                 return []
 
     except Exception as e:
@@ -200,10 +193,10 @@ def main():
         mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Concentración", "Trabajo", "Descanso"])
         genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock Progresivo", "Hip Hop", "Jazz"])
         playlist_name = st.text_input("📜 Nombre de la lista de reproducción", placeholder="Mi nueva playlist")
-        playlist_description = st.text_area("📝 Descripción de la lista", placeholder="Describe tu playlist")
+        playlist_description = st.text_area("📝 Descripción de la lista", placeholder="Describe tu playlist (obligatorio)")
 
         if st.button("🎵 Generar y Crear Lista 🎵"):
-            if user_id and mood and genres and playlist_name and playlist_description:
+            if user_id and mood and genres and playlist_name and playlist_description.strip():
                 st.info("🎧 Generando canciones...")
                 songs = generate_songs(mood, genres)
 
@@ -228,7 +221,7 @@ def main():
                 else:
                     st.error("❌ No se pudieron generar canciones.")
             else:
-                st.warning("⚠️ Completa todos los campos para crear la lista.")
+                st.warning("⚠️ Completa todos los campos para crear la lista. La descripción es obligatoria.")
 
 if __name__ == "__main__":
     main()
