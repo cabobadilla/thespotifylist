@@ -87,23 +87,27 @@ def generate_songs(mood, genres):
         )
         songs_response = response.choices[0].message.content.strip()
 
+        # Verificar si la respuesta está vacía
+        if not songs_response:
+            st.error("❌ La respuesta de ChatGPT está vacía. Intenta nuevamente.")
+            return []
+
         # Log the raw response for debugging
         st.info("📜 Respuesta de ChatGPT:")
         st.text(songs_response)
 
         # Clean and validate the JSON
         try:
-            # Intentar parsear directamente
-            songs_data = json.loads(songs_response)
-
-            # Validar estructura esperada
+            songs_data = json.loads(songs_response)  # Convertir la respuesta a JSON
             if "songs" in songs_data and isinstance(songs_data["songs"], list):
                 songs = songs_data["songs"]
+                # Ensure all songs have 'title' and 'artist'
                 if all("title" in song and "artist" in song for song in songs):
                     return songs
                 else:
                     raise ValueError("La lista de canciones no contiene los campos 'title' y 'artist'.")
-
+            else:
+                raise ValueError("El objeto JSON no contiene la clave 'songs' o no es una lista.")
         except json.JSONDecodeError:
             # Reprocesar el JSON eliminando caracteres adicionales
             st.warning("⚠️ Intentando limpiar el JSON generado...")
