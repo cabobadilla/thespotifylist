@@ -82,7 +82,19 @@ def generate_songs(mood, genres):
             temperature=0.7,
         )
         songs = response.choices[0].message.content.strip()
-        return json.loads(songs)
+        
+        # Validar y limpiar el JSON
+        try:
+            cleaned_songs = json.loads(songs)
+            if isinstance(cleaned_songs, list) and all("title" in song and "artist" in song for song in cleaned_songs):
+                return cleaned_songs
+            else:
+                raise ValueError("El formato de la respuesta no es una lista válida de canciones.")
+        except json.JSONDecodeError:
+            st.error("❌ La respuesta de ChatGPT no es un JSON válido. Verifica el contenido de la respuesta:")
+            st.write(songs)
+            return []
+
     except Exception as e:
         st.error(f"❌ Error al generar las canciones: {e}")
         return []
