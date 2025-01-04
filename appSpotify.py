@@ -2,7 +2,6 @@ import openai
 import json
 import streamlit as st
 import requests
-import base64
 from urllib.parse import urlencode
 
 # Estilo de Spotify (colores verde y negro)
@@ -42,14 +41,17 @@ st.markdown(
 # Spotify API Credentials
 CLIENT_ID = st.secrets["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = st.secrets["SPOTIFY_CLIENT_SECRET"]
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]  # Clave de OpenAI
-REDIRECT_URI = st.secrets.get("SPOTIFY_REDIRECT_URI", "http://localhost:8501/callback")  # Configurado como secreto
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+REDIRECT_URI = st.secrets.get("SPOTIFY_REDIRECT_URI", "http://localhost:8501/callback")
 
 # Scopes for Spotify API
 SCOPES = "playlist-modify-private playlist-modify-public"
 
 # Function to get authorization URL
 def get_auth_url(client_id, redirect_uri, scopes):
+    """
+    Constructs the Spotify authorization URL.
+    """
     auth_url = "https://accounts.spotify.com/authorize"
     params = {
         "client_id": client_id,
@@ -109,18 +111,13 @@ def main():
         unsafe_allow_html=True
     )
     if "access_token" not in st.session_state:
-        auth_url = "https://accounts.spotify.com/authorize"
-        params = {
-            "client_id": CLIENT_ID,
-            "response_type": "code",
-            "redirect_uri": REDIRECT_URI,
-            "scope": SCOPES,
-        }
+        # Generar la URL de autorización
+        auth_url = get_auth_url(CLIENT_ID, REDIRECT_URI, SCOPES)
         st.markdown(
             f"<div style='text-align: center;'><a href='{auth_url}' target='_blank' style='color: #1DB954; font-weight: bold;'>🔑 Iniciar sesión en Spotify</a></div>",
             unsafe_allow_html=True
         )
-        # Listen for the authorization code in the URL
+        # Verificar si se recibió el código de autorización
         query_params = st.query_params
         if "code" in query_params:
             code = query_params["code"]
@@ -160,7 +157,6 @@ def main():
                 playlist_description = details["description"]
                 st.success(f"✅ Nombre generado: {playlist_name}")
                 st.info(f"Descripción generada: {playlist_description}")
-                # Aquí se integran las funciones de generación de canciones y creación de listas
                 st.success(f"✅ Lista de reproducción '{playlist_name}' creada exitosamente.")
                 st.markdown("<h3>🎵 Lista de canciones agregadas:</h3>", unsafe_allow_html=True)
                 st.markdown("- **Ejemplo Canción 1** - Artista 1")
