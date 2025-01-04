@@ -190,8 +190,8 @@ def main():
         token = st.session_state.access_token
         st.markdown("<h2>🎶 Generar y Crear Lista de Reproducción</h2>", unsafe_allow_html=True)
         user_id = st.text_input("🎤 Introduce tu ID de usuario de Spotify", placeholder="Usuario de Spotify")
-        mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Concentración", "Trabajo", "Descanso"])
-        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock Progresivo", "Hip Hop", "Jazz"])
+        mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Concentración", "Deporte", "Descanso"])
+        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Rock Pesado", "Rock 80 y 90s", "Rock Progresivo", "Rock Latino", "Jazz"])
         playlist_name = st.text_input("📜 Nombre de la lista de reproducción", placeholder="Mi nueva playlist")
         playlist_description = st.text_area("📝 Descripción de la lista", placeholder="Describe tu playlist (obligatorio)")
 
