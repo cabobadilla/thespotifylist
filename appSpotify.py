@@ -60,13 +60,17 @@ def get_auth_url(client_id, redirect_uri, scopes):
 
 # Function to generate songs using ChatGPT
 def generate_songs(mood, genres):
+    """
+    Generate a list of songs based on the mood and genres provided.
+    """
     openai.api_key = OPENAI_API_KEY
     messages = [
         {
             "role": "system",
             "content": (
                 "You are a music expert. Generate a list of 10 songs based on the mood and genres provided. "
-                "Respond in JSON format with each song containing 'title' and 'artist'."
+                "Respond in JSON format as an object with a 'songs' key containing an array of song objects. "
+                "Each song object must have 'title' and 'artist'."
             ),
         },
         {
@@ -81,18 +85,22 @@ def generate_songs(mood, genres):
             max_tokens=500,
             temperature=0.7,
         )
-        songs = response.choices[0].message.content.strip()
+        songs_response = response.choices[0].message.content.strip()
         
         # Validar y limpiar el JSON
         try:
-            cleaned_songs = json.loads(songs)
-            if isinstance(cleaned_songs, list) and all("title" in song and "artist" in song for song in cleaned_songs):
-                return cleaned_songs
+            songs_data = json.loads(songs_response)  # Convertir la respuesta a JSON
+            if "songs" in songs_data and isinstance(songs_data["songs"], list):
+                songs = songs_data["songs"]
+                if all("title" in song and "artist" in song for song in songs):
+                    return songs
+                else:
+                    raise ValueError("El formato de la lista de canciones no es válido.")
             else:
-                raise ValueError("El formato de la respuesta no es una lista válida de canciones.")
+                raise ValueError("La clave 'songs' no está presente o no es una lista.")
         except json.JSONDecodeError:
             st.error("❌ La respuesta de ChatGPT no es un JSON válido. Verifica el contenido de la respuesta:")
-            st.write(songs)
+            st.write(songs_response)
             return []
 
     except Exception as e:
