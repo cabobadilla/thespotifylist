@@ -149,6 +149,22 @@ def validate_and_clean_json(raw_response):
     # Return validated data
     return playlist_data["name"], playlist_data["description"], playlist_data["songs"]
 
+# Function to search for songs on Spotify
+def search_tracks(token, query):
+    """
+    Search for a track on Spotify using the given query.
+    """
+    url = "https://api.spotify.com/v1/search"
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {"q": query, "type": "track", "limit": 1}
+    response = requests.get(url, headers=headers, params=params)
+    
+    if response.status_code != 200:
+        st.error(f"❌ Error en la búsqueda de canciones: {response.json().get('error', {}).get('message', 'Unknown error')}")
+        return {"tracks": {"items": []}}
+
+    return response.json()
+
 # Function to create a playlist on Spotify
 def create_playlist(token, user_id, name, description):
     url = f"https://api.spotify.com/v1/users/{user_id}/playlists"
@@ -156,6 +172,14 @@ def create_playlist(token, user_id, name, description):
     payload = {"name": name, "description": description, "public": False}
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
+
+# Function to add songs to a playlist on Spotify
+def add_tracks_to_playlist(token, playlist_id, track_uris):
+    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"uris": track_uris}
+    response = requests.post(url, headers=headers, json=payload)
+    return response
 
 # Streamlit App
 def main():
