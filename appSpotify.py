@@ -47,6 +47,20 @@ REDIRECT_URI = st.secrets.get("SPOTIFY_REDIRECT_URI", "http://localhost:8501/cal
 # Scopes for Spotify API
 SCOPES = "playlist-modify-private playlist-modify-public"
 
+# Load configuration from Streamlit secrets
+def load_config():
+    """
+    Load configuration from Streamlit secrets.
+    """
+    try:
+        config = st.secrets["config"]
+        return config
+    except KeyError:
+        st.error("❌ Configuración no encontrada en los secretos de Streamlit.")
+        return {"moods": [], "genres": []}
+
+config = load_config()
+
 # Function to get authorization URL
 def get_auth_url(client_id, redirect_uri, scopes):
     auth_url = "https://accounts.spotify.com/authorize"
@@ -61,23 +75,25 @@ def get_auth_url(client_id, redirect_uri, scopes):
 # Function to generate songs, playlist name, and description using ChatGPT
 def generate_playlist_details(mood, genres):
     """
-    Generate a list of 20 songs, a playlist name (max 4 words), and a description (max 20 words) 
-    based on the mood and genres provided.
+    Generate a playlist name, description, and 20 songs that connect with the mood and genres provided.
+    ChatGPT will act as a DJ curating songs that align with the mood.
     """
     openai.api_key = OPENAI_API_KEY
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a music expert and creative assistant. Generate a playlist name (max 4 words), "
-                "a description (max 20 words), and 20 songs based on the mood and genres provided. "
-                "Respond in JSON format with 'name', 'description', and 'songs' keys. "
-                "The 'songs' key should contain an array of song objects, each with 'title' and 'artist'."
+                "You are a music expert and DJ who curates playlists based on mood and genres. "
+                "Your job is to act as a DJ and create a playlist that connects deeply with the given mood and genres. "
+                "Generate a playlist name (max 4 words), a description (max 20 words), and 20 songs. "
+                "Each song must include 'title' and 'artist'. Respond in JSON format with the following structure: "
+                "{ 'name': '...', 'description': '...', 'songs': [{'title': '...', 'artist': '...'}] }"
             ),
         },
         {
             "role": "user",
-            "content": f"Generate a playlist for the mood '{mood}' and the genres {', '.join(genres)}."
+            "content": f"Create a playlist for the mood '{mood}' and genres {', '.join(genres)}. "
+                       f"Make sure the songs align with the mood and genres."
         },
     ]
     try:
@@ -89,29 +105,49 @@ def generate_playlist_details(mood, genres):
         )
         playlist_response = response.choices[0].message.content.strip()
 
-        # Validar y limpiar el JSON
+        # Validate and clean the JSON
         try:
-            playlist_data = json.loads(playlist_response)  # Convertir la respuesta a JSON
-            if (
-                "name" in playlist_data and "description" in playlist_data and "songs" in playlist_data and 
-                isinstance(playlist_data["songs"], list)
-            ):
-                name = playlist_data["name"]
-                description = playlist_data["description"]
-                songs = playlist_data["songs"]
-                # Validar que las canciones tengan 'title' y 'artist'
-                if all("title" in song and "artist" in song for song in songs):
-                    return name, description, songs
-                else:
-                    raise ValueError("Las canciones no contienen los campos 'title' y 'artist'.")
-            else:
-                raise ValueError("El JSON no contiene las claves esperadas ('name', 'description', 'songs').")
-        except json.JSONDecodeError:
-            st.error("❌ La respuesta de ChatGPT no es un JSON válido.")
+            return validate_and_clean_json(playlist_response)
+        except ValueError as e:
+            st.error(f"❌ Error al procesar la respuesta de ChatGPT: {e}")
             return None, None, []
+
     except Exception as e:
         st.error(f"❌ Error al generar la playlist: {e}")
         return None, None, []
+
+# Function to validate and clean JSON
+def validate_and_clean_json(raw_response):
+    """
+    Validate and clean the JSON response from ChatGPT.
+    Ensures that it conforms to the expected structure.
+    """
+    if not raw_response:
+        raise ValueError("La respuesta de ChatGPT está vacía.")
+    
+    # Attempt to parse the JSON directly
+    try:
+        playlist_data = json.loads(raw_response)
+    except json.JSONDecodeError:
+        # Remove common formatting issues like backticks or "json"
+        cleaned_response = raw_response.replace("```json", "").replace("```", "").strip()
+        try:
+            playlist_data = json.loads(cleaned_response)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"No se pudo procesar el JSON incluso después de limpiar: {e}")
+
+    # Validate the structure of the JSON
+    if not isinstance(playlist_data, dict):
+        raise ValueError("El JSON no es un objeto válido.")
+    if "name" not in playlist_data or "description" not in playlist_data or "songs" not in playlist_data:
+        raise ValueError("El JSON no contiene las claves esperadas ('name', 'description', 'songs').")
+    if not isinstance(playlist_data["songs"], list):
+        raise ValueError("El campo 'songs' no es una lista.")
+    if not all("title" in song and "artist" in song for song in playlist_data["songs"]):
+        raise ValueError("Las canciones no contienen los campos 'title' y 'artist'.")
+
+    # Return validated data
+    return playlist_data["name"], playlist_data["description"], playlist_data["songs"]
 
 # Function to create a playlist on Spotify
 def create_playlist(token, user_id, name, description):
@@ -120,22 +156,6 @@ def create_playlist(token, user_id, name, description):
     payload = {"name": name, "description": description, "public": False}
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
-
-# Function to search for songs on Spotify
-def search_tracks(token, query):
-    url = "https://api.spotify.com/v1/search"
-    headers = {"Authorization": f"Bearer {token}"}
-    params = {"q": query, "type": "track", "limit": 1}
-    response = requests.get(url, headers=headers, params=params)
-    return response.json()
-
-# Function to add songs to a playlist on Spotify
-def add_tracks_to_playlist(token, playlist_id, track_uris):
-    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {"uris": track_uris}
-    response = requests.post(url, headers=headers, json=payload)
-    return response
 
 # Streamlit App
 def main():
@@ -182,8 +202,8 @@ def main():
         token = st.session_state.access_token
         st.markdown("<h2>🎶 Generar y Crear Lista de Reproducción</h2>", unsafe_allow_html=True)
         user_id = st.text_input("🎤 Introduce tu ID de usuario de Spotify", placeholder="Usuario de Spotify")
-        mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", ["Full Focused", "Creative and Inspired", "Assertive", "Relaxed"])
-        genres = st.multiselect("🎸 Selecciona los géneros musicales", ["Hard Rock", "Classic Rock", "Progressive Rock", "Hip Hop", "Rap"])
+        mood = st.selectbox("😊 Selecciona tu estado de ánimo deseado", config["moods"])
+        genres = st.multiselect("🎸 Selecciona los géneros musicales", config["genres"])
 
         if st.button("🎵 Generar y Crear Lista 🎵"):
             if user_id and mood and genres:
