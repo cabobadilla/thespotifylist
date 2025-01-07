@@ -85,6 +85,7 @@ def generate_playlist_details(mood, genres):
             "content": (
                 "You are a music expert and DJ who curates playlists based on mood and genres. "
                 "Your job is to act as a DJ and create a playlist that connects deeply with the given mood and genres. "
+                "Choose song names without special characters in the name to avoid impact the JSON format"
                 "Generate a playlist name (max 4 words), a description (max 20 words), and 20 songs. "
                 "Each song must include 'title' and 'artist'. Respond in JSON format with the following structure: "
                 "{ 'name': '...', 'description': '...', 'songs': [{'title': '...', 'artist': '...'}] }"
