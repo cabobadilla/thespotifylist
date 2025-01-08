@@ -86,6 +86,7 @@ def generate_playlist_details(mood, genres):
                 "You are a music expert and DJ who curates playlists based on mood and genres. "
                 "Your job is to act as a DJ and create a playlist that connects deeply with the given mood and genres. "
                 "Generate a playlist name (max 4 words), a description (max 20 words), and 20 songs. "
+                "Ensure all song names are free from special characters to maintain JSON format compatibility. "
                 "Each song must include 'title' and 'artist'. Respond in JSON format with the following structure: "
                 "{ 'name': '...', 'description': '...', 'songs': [{'title': '...', 'artist': '...'}] }"
             ),
@@ -124,19 +125,14 @@ def validate_and_clean_json(raw_response):
     """
     if not raw_response:
         raise ValueError("La respuesta de ChatGPT está vacía.")
-    
-    # Attempt to parse the JSON directly
     try:
         playlist_data = json.loads(raw_response)
     except json.JSONDecodeError:
-        # Remove common formatting issues like backticks or "json"
         cleaned_response = raw_response.replace("```json", "").replace("```", "").strip()
         try:
             playlist_data = json.loads(cleaned_response)
         except json.JSONDecodeError as e:
             raise ValueError(f"No se pudo procesar el JSON incluso después de limpiar: {e}")
-
-    # Validate the structure of the JSON
     if not isinstance(playlist_data, dict):
         raise ValueError("El JSON no es un objeto válido.")
     if "name" not in playlist_data or "description" not in playlist_data or "songs" not in playlist_data:
@@ -145,24 +141,21 @@ def validate_and_clean_json(raw_response):
         raise ValueError("El campo 'songs' no es una lista.")
     if not all("title" in song and "artist" in song for song in playlist_data["songs"]):
         raise ValueError("Las canciones no contienen los campos 'title' y 'artist'.")
-
-    # Return validated data
     return playlist_data["name"], playlist_data["description"], playlist_data["songs"]
 
 # Function to search for songs on Spotify
-def search_tracks(token, query):
+def search_tracks(token, title, artist):
     """
-    Search for a track on Spotify using the given query.
+    Search for a track on Spotify using the given title and artist.
     """
+    query = f"{title} {artist}"
     url = "https://api.spotify.com/v1/search"
     headers = {"Authorization": f"Bearer {token}"}
     params = {"q": query, "type": "track", "limit": 1}
     response = requests.get(url, headers=headers, params=params)
-    
     if response.status_code != 200:
         st.error(f"❌ Error en la búsqueda de canciones: {response.json().get('error', {}).get('message', 'Unknown error')}")
         return {"tracks": {"items": []}}
-
     return response.json()
 
 # Function to create a playlist on Spotify
@@ -185,7 +178,7 @@ def add_tracks_to_playlist(token, playlist_id, track_uris):
 def main():
     st.markdown(
         """
-        <h1 style='text-align: center;'>🎵 Spotify Playlist Creator 🎵</h1>
+        <h1 style='text-align: center;'>🎵 Spotify Playlist Creator Dev 🎵</h1>
         <h3 style='text-align: center;'>Crea listas de reproducción personalizadas según tu estado de ánimo y género favorito.</h3>
         """,
         unsafe_allow_html=True
@@ -240,11 +233,12 @@ def main():
                     st.success(f"🎵 Canciones generadas:")
                     track_uris = []
                     for song in songs:
-                        query = f"{song['title']} {song['artist']}"
-                        search_response = search_tracks(token, query)
+                        title = song['title']
+                        artist = song['artist']
+                        search_response = search_tracks(token, title, artist)
                         if "tracks" in search_response and search_response["tracks"]["items"]:
                             track_uris.append(search_response["tracks"]["items"][0]["uri"])
-                            st.write(f"- **{song['title']}** - {song['artist']}")
+                            st.write(f"- **{title}** - {artist}")
 
                     if track_uris:
                         playlist_response = create_playlist(token, user_id, name, description)
